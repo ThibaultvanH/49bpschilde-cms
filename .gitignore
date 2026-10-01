@@ -40,3 +40,6 @@ next-env.d.ts
 
 # Database
 local.db
+
+# Local Netlify folder
+.netlify
