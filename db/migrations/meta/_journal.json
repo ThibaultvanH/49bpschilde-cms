@@ -92,6 +92,13 @@
       "when": 1778731770759,
       "tag": "0012_collaborator_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790878582034,
+      "tag": "0013_collaborator_roles",
+      "breakpoints": true
     }
   ]
 }

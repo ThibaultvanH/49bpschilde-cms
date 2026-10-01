@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { createOctokitInstance } from "@/lib/utils/octokit";
 import { getSchemaByName } from "@/lib/schema";
-import { getConfig } from "@/lib/config-store";
+import { getAccessConfig } from "@/lib/access-policy";
 import { getFileExtension, normalizePath } from "@/lib/utils/file";
 import { assertGithubIdentity } from "@/lib/authz-shared";
 import { getToken } from "@/lib/token";
@@ -38,7 +38,7 @@ export async function GET(
     }
     
     if (name) {
-      const config = await getConfig(params.owner, params.repo, params.branch, {
+      const config = await getAccessConfig(user, params.owner, params.repo, params.branch, {
         getToken: async () => token,
       });
       if (!config) throw createHttpError(`Configuration not found for ${params.owner}/${params.repo}/${params.branch}.`, 404);

@@ -2,6 +2,7 @@ import { createOctokitInstance } from "@/lib/utils/octokit";
 import { getToken } from "@/lib/token";
 import { createHttpError, toErrorResponse } from "@/lib/api-error";
 import { requireApiUserSession } from "@/lib/session-server";
+import { requireAdmin } from "@/lib/access-policy";
 
 /**
  * Creates a new branch in a GitHub repository.
@@ -21,6 +22,7 @@ export async function POST(
     if ("response" in sessionResult) return sessionResult.response;
     const user = sessionResult.user;
 
+    await requireAdmin(user, params.owner, params.repo);
     const { token } = await getToken(user, params.owner, params.repo, true);
     if (!token) throw createHttpError("Token not found", 401);
 

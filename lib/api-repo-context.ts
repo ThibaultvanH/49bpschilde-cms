@@ -1,5 +1,5 @@
 import { createHttpError } from "@/lib/api-error";
-import { getConfig } from "@/lib/config-store";
+import { getAccessConfig } from "@/lib/access-policy";
 import { getGithubId } from "@/lib/github-account";
 import { checkRepoAccess } from "@/lib/github-cache-permissions";
 import { requireApiUserSession } from "@/lib/session-server";
@@ -35,7 +35,7 @@ const getRepoReadContext = async ({ owner, repo, branch }: RepoRef): Promise<Rep
     if (!hasAccess) throw createHttpError(`No access to repository ${owner}/${repo}.`, 403);
   }
 
-  const config = await getConfig(owner, repo, branch, {
+  const config = await getAccessConfig(user, owner, repo, branch, {
     getToken: async () => token,
   });
   if (!config) throw createHttpError(`Configuration not found for ${owner}/${repo}/${branch}.`, 404);

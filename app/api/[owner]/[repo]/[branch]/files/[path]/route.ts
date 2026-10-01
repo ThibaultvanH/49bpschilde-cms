@@ -5,7 +5,8 @@ import { writeFns } from "@/fields/registry";
 import { configVersion, parseConfig, normalizeConfig } from "@/lib/config";
 import { stringify, parse } from "@/lib/serialization";
 import { deepMap, generateZodSchema, getSchemaByName, sanitizeObject } from "@/lib/schema";
-import { getConfig, updateConfig } from "@/lib/config-store";
+import { updateConfig } from "@/lib/config-store";
+import { getAccessConfig } from "@/lib/access-policy";
 import { getFileExtension, getFileName, normalizePath, serializedTypes, getParentPath } from "@/lib/utils/file";
 import { assertGithubIdentity } from "@/lib/authz-shared";
 import { getToken } from "@/lib/token";
@@ -39,7 +40,7 @@ export async function POST(
 
     const normalizedPath = normalizePath(params.path);
 
-    const config = await getConfig(params.owner, params.repo, params.branch, {
+    const config = await getAccessConfig(user, params.owner, params.repo, params.branch, {
       getToken: async () => token,
     });
     if (!config && normalizedPath !== ".pages.yml") throw new Error(`Configuration not found for ${params.owner}/${params.repo}/${params.branch}.`);
@@ -472,7 +473,7 @@ export async function DELETE(
     if (!name && type === "content") throw new Error(`"name" is required.`);
     if (!sha) throw new Error(`"sha" is required.`);
 
-    const config = await getConfig(params.owner, params.repo, params.branch, {
+    const config = await getAccessConfig(user, params.owner, params.repo, params.branch, {
       getToken: async () => token,
     });
     if (!config) throw new Error(`Configuration not found for ${params.owner}/${params.repo}/${params.branch}.`);

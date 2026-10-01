@@ -3,7 +3,7 @@ import { createOctokitInstance } from "@/lib/utils/octokit";
 import { readFns } from "@/fields/registry";
 import { deepMap, getSchemaByName } from "@/lib/schema";
 import { parse } from "@/lib/serialization";
-import { getConfig } from "@/lib/config-store";
+import { getAccessConfig } from "@/lib/access-policy";
 import { getFileExtension, normalizePath } from "@/lib/utils/file";
 import { assertGithubIdentity } from "@/lib/authz-shared";
 import { getToken } from "@/lib/token";
@@ -49,7 +49,7 @@ export async function GET(
     }
 
     if (!name && normalizedPath === ".pages.yml" && metaOnly) {
-      const cachedConfig = await getConfig(params.owner, params.repo, params.branch, {
+      const cachedConfig = await getAccessConfig(user, params.owner, params.repo, params.branch, {
         getToken: async () => token,
       });
       return Response.json({
@@ -66,7 +66,7 @@ export async function GET(
     let schema;
 
     if (name) {
-      config = await getConfig(params.owner, params.repo, params.branch, {
+      config = await getAccessConfig(user, params.owner, params.repo, params.branch, {
         getToken: async () => token,
       });
       if (!config) throw createHttpError(`Configuration not found for ${params.owner}/${params.repo}/${params.branch}.`, 404);

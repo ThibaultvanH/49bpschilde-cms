@@ -5,6 +5,7 @@ import { createOctokitInstance } from "@/lib/utils/octokit";
 import { getToken } from "@/lib/token";
 import { createHttpError, toErrorResponse } from "@/lib/api-error";
 import { requireApiUserSession } from "@/lib/session-server";
+import { requireAdmin } from "@/lib/access-policy";
 import { resolveActionRef } from "@/lib/actions";
 import { hasGithubIdentity } from "@/lib/authz-shared";
 
@@ -202,6 +203,7 @@ export async function GET(
     if ("response" in sessionResult) return sessionResult.response;
     const user = sessionResult.user;
     const isGithubUser = hasGithubIdentity(user);
+    await requireAdmin(user, params.owner, params.repo);
     const { token } = await getToken(user, params.owner, params.repo, true);
     const octokit = createOctokitInstance(token);
 
@@ -350,6 +352,7 @@ export async function POST(
     if ("response" in sessionResult) return sessionResult.response;
     const user = sessionResult.user;
 
+    await requireAdmin(user, params.owner, params.repo);
     const { token } = await getToken(user, params.owner, params.repo, true);
     const octokit = createOctokitInstance(token);
 

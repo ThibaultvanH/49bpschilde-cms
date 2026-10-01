@@ -53,13 +53,138 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { requireApiSuccess } from "@/lib/api-client";
+import { useConfig } from "@/contexts/config-context";
 import { toast } from "sonner";
 import { BookText, EllipsisVertical, Loader } from "lucide-react";
 
 type Collaborator = {
   id: number;
   email: string;
+  role?: string;
+  allowedEntries?: string | null;
+  allowedBranches?: string | null;
 };
+
+const readList = (value?: string | null): string[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Dialog to set a collaborator's role: admin (everything) or editor (chosen entries + branches).
+function RoleDialog({
+  owner,
+  repo,
+  collaborator,
+  entries,
+  onClose,
+  onSaved,
+}: {
+  owner: string;
+  repo: string;
+  collaborator: Collaborator | null;
+  entries: { name: string; label: string }[];
+  onClose: () => void;
+  onSaved: (updated: Collaborator) => void;
+}) {
+  const [role, setRole] = useState<"admin" | "editor">("editor");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [branches, setBranches] = useState("staging");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!collaborator) return;
+    setRole(collaborator.role === "admin" ? "admin" : "editor");
+    const stored = readList(collaborator.allowedEntries);
+    setSelected(stored.includes("*") ? entries.map((e) => e.name) : stored);
+    const storedBranches = readList(collaborator.allowedBranches);
+    setBranches(storedBranches.length > 0 ? storedBranches.join(", ") : "staging");
+  }, [collaborator, entries]);
+
+  const toggle = (name: string) =>
+    setSelected((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
+
+  const save = async () => {
+    if (!collaborator) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/collaborators/${owner}/${repo}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: collaborator.id,
+          role,
+          allowedEntries: selected,
+          allowedBranches: branches.split(/[\n,]+/).map((b) => b.trim()).filter(Boolean),
+        }),
+      });
+      const data = await requireApiSuccess<{ data: Collaborator; message?: string }>(response, "Failed to update role");
+      onSaved(data.data);
+      toast.success(`Role of ${collaborator.email} updated.`);
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={Boolean(collaborator)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Role of {collaborator?.email}</DialogTitle>
+          <DialogDescription>
+            Admins can do everything. Editors only see and edit what you tick below, and only on the listed branches.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <div className="flex gap-4">
+            {(["editor", "admin"] as const).map((r) => (
+              <label key={r} className="flex items-center gap-2">
+                <input type="radio" name="role" checked={role === r} onChange={() => setRole(r)} />
+                {r === "admin" ? "Admin (everything)" : "Editor (limited)"}
+              </label>
+            ))}
+          </div>
+          {role === "editor" ? (
+            <>
+              <div>
+                <div className="font-medium mb-2">Allowed content</div>
+                <div className="max-h-56 overflow-y-auto space-y-1 border rounded-md p-2">
+                  {entries.map((entry) => (
+                    <label key={entry.name} className="flex items-center gap-2">
+                      <input type="checkbox" checked={selected.includes(entry.name)} onChange={() => toggle(entry.name)} />
+                      {entry.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium mb-2">Allowed branches (comma separated)</div>
+                <input
+                  className="w-full border rounded-md px-2 py-1"
+                  value={branches}
+                  onChange={(e) => setBranches(e.target.value)}
+                  placeholder="staging"
+                />
+              </div>
+            </>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button onClick={() => void save()} disabled={saving}>
+            {saving ? "Saving…" : "Save role"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 type AddCollaboratorState = {
   message?: string;
@@ -170,6 +295,15 @@ export function Collaborators({
   const [removing, setRemoving] = useState<number[]>([]);
   const [resending, setResending] = useState<number[]>([]);
   const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null);
+  const [roleEditId, setRoleEditId] = useState<number | null>(null);
+  const { config } = useConfig();
+  const contentEntries = useMemo(
+    () =>
+      ((config?.object?.content as any[]) ?? [])
+        .filter((entry) => entry?.name)
+        .map((entry) => ({ name: String(entry.name), label: String(entry.label || entry.name) })),
+    [config],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | undefined | null>(null);
 
@@ -422,6 +556,14 @@ export function Collaborators({
                 <div className="font-medium text-left truncate">
                   {collaborator.email}
                 </div>
+                <span className="text-xs rounded-full border px-2 py-0.5 text-muted-foreground whitespace-nowrap">
+                  {collaborator.role === "admin"
+                    ? "Admin"
+                    : (() => {
+                        const n = readList(collaborator.allowedEntries);
+                        return n.includes("*") ? "Editor · all content" : `Editor · ${n.length} item${n.length === 1 ? "" : "s"}`;
+                      })()}
+                </span>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -444,6 +586,9 @@ export function Collaborators({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setRoleEditId(collaborator.id)}>
+                      Edit role…
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => void handleResendInvite(collaborator.id)}
                       disabled={
@@ -469,6 +614,17 @@ export function Collaborators({
               </li>
             ))}
           </ul>
+
+          <RoleDialog
+            owner={owner}
+            repo={repo}
+            collaborator={collaborators.find((c) => c.id === roleEditId) || null}
+            entries={contentEntries}
+            onClose={() => setRoleEditId(null)}
+            onSaved={(updated) =>
+              setCollaborators((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)))
+            }
+          />
 
           <AlertDialog
             open={Boolean(collaboratorToRemove)}

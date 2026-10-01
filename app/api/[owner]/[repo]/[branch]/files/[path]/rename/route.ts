@@ -1,7 +1,7 @@
 import { createOctokitInstance } from "@/lib/utils/octokit";
 import { isContentOperationAllowed } from "@/lib/operations";
 import { getSchemaByName } from "@/lib/schema";
-import { getConfig } from "@/lib/config-store";
+import { getAccessConfig } from "@/lib/access-policy";
 import { getFileExtension, normalizePath } from "@/lib/utils/file";
 import { getToken } from "@/lib/token";
 import { updateFileCache } from "@/lib/github-cache-file";
@@ -35,7 +35,7 @@ export async function POST(
       throw createHttpError(`Renaming the settings file isn't allowed.`, 403);
     }
 
-    const config = await getConfig(params.owner, params.repo, params.branch, {
+    const config = await getAccessConfig(user, params.owner, params.repo, params.branch, {
       getToken: async () => token,
     });
     if (!config) throw new Error(`Configuration not found for ${params.owner}/${params.repo}/${params.branch}.`);

@@ -5,6 +5,7 @@ import { createOctokitInstance } from "@/lib/utils/octokit";
 import { getToken } from "@/lib/token";
 import { createHttpError, toErrorResponse } from "@/lib/api-error";
 import { requireApiUserSession } from "@/lib/session-server";
+import { requireAdmin } from "@/lib/access-policy";
 import { resolveActionRef } from "@/lib/actions";
 import { hasGithubIdentity } from "@/lib/authz-shared";
 
@@ -155,7 +156,8 @@ export async function GET(
     let syncedRow = row;
 
     if (row.status !== "completed") {
-      const { token } = await getToken(user, params.owner, params.repo, true);
+      await requireAdmin(user, params.owner, params.repo);
+    const { token } = await getToken(user, params.owner, params.repo, true);
       const octokit = createOctokitInstance(token);
       if (!row.workflowRunId) {
         const workflowRun = await findWorkflowRun(
@@ -241,6 +243,7 @@ export async function POST(
       throw createHttpError("Action run not found.", 404);
     }
 
+    await requireAdmin(user, params.owner, params.repo);
     const { token } = await getToken(user, params.owner, params.repo, true);
     const octokit = createOctokitInstance(token);
     const isGithubUser = hasGithubIdentity(user);
